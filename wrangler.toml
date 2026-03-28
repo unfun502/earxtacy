@@ -1,0 +1,17 @@
+name = "earxtacy"
+main = "worker.js"
+compatibility_date = "2024-09-25"
+
+[vars]
+UMAMI_SITE_ID = "42883f3f-8594-46e6-9c46-f24da51c060e"
+
+[site]
+bucket = "./dist"
+
+[env.production]
+routes = [
+  { pattern = "earxtacy.devlab502.net", custom_domain = true }
+]
+
+[env.production.vars]
+UMAMI_SITE_ID = "42883f3f-8594-46e6-9c46-f24da51c060e"
