@@ -141,7 +141,7 @@ export function NavTabs({ active, onChange }) {
       {pages.map((p) => (
         <button
           key={p.key}
-          onClick={() => onChange(p.key)}
+          onClick={() => { onChange(p.key); window.umami?.track("page_change", { page: p.key }); }}
           style={{
             fontFamily: "'DM Mono', monospace",
             fontSize: 10,
@@ -174,7 +174,7 @@ export function StoreTabs({ active, onChange }) {
       {options.map((o) => (
         <button
           key={o.key}
-          onClick={() => onChange(o.key)}
+          onClick={() => { onChange(o.key); window.umami?.track("store_filter", { store: o.key }); }}
           style={{
             fontFamily: "'DM Mono', monospace",
             fontSize: 10,
@@ -203,7 +203,7 @@ export function YearTabs({ active, onChange }) {
       {["all", "1998", "1999", "2000"].map((y) => (
         <button
           key={y}
-          onClick={() => onChange(y)}
+          onClick={() => { onChange(y); window.umami?.track("year_filter", { year: y }); }}
           style={{
             fontFamily: "'DM Mono', monospace",
             fontSize: 10,

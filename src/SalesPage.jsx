@@ -102,6 +102,7 @@ export default function SalesPage({ activeStore, activeYear, filteredData, total
     }
     setFilters(next);
     setLedgerPage(0);
+    window.umami?.track("ledger_filter", { filter: key, value });
   };
 
   const toggleSort = (col) => {
@@ -111,6 +112,7 @@ export default function SalesPage({ activeStore, activeYear, filteredData, total
       setFilters({ ...filters, sortBy: col, sortDir: "desc" });
     }
     setLedgerPage(0);
+    window.umami?.track("ledger_sort", { column: col });
   };
 
   // ── STORE/YEAR SCALING ──
