@@ -1,6 +1,10 @@
-import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
-import manifestJSON from '__STATIC_CONTENT_MANIFEST';
-const assetManifest = JSON.parse(manifestJSON);
+/**
+ * Serves the Vite build from Workers Static Assets (binding ASSETS), adding
+ * security headers, cache rules and Umami injection. Every request runs through
+ * here (run_worker_first in wrangler.toml); unknown paths get the SPA shell
+ * (index.html, 200) from not_found_handling, as the old KV fallback did.
+ * Asset reads are not KV operations.
+ */
 
 // ── Security headers ─────────────────────────────────────────
 function buildCSP() {
@@ -27,33 +31,29 @@ function addSecurityHeaders(headers) {
 }
 
 // ── Static asset serving ─────────────────────────────────────
-async function handleStaticAsset(request, env, ctx) {
-  const event = { request, waitUntil: ctx.waitUntil.bind(ctx) };
-  const options = {
-    ASSET_NAMESPACE: env.__STATIC_CONTENT,
-    ASSET_MANIFEST: assetManifest,
-  };
+// HTML (by path, or any text/html response such as the SPA fallback for
+// /.env probes) must revalidate on every load so deploys show up at once.
+// Hashed Vite bundles under /assets/ never change, so cache them for a year.
+// Anything else keeps the asset layer's default (revalidate).
+function isHtml(path, response) {
+  return (
+    !path.includes('.') ||
+    path.endsWith('.html') ||
+    (response.headers.get('content-type') || '').includes('text/html')
+  );
+}
 
-  try {
-    const response = await getAssetFromKV(event, options);
-    const headers = new Headers(response.headers);
-    addSecurityHeaders(headers);
-    return injectAnalytics(new Response(response.body, { status: response.status, headers }), env);
-  } catch {
-    // SPA fallback — serve index.html for client-side routing
-    try {
-      const fallbackEvent = {
-        request: new Request(`${new URL(request.url).origin}/index.html`, request),
-        waitUntil: ctx.waitUntil.bind(ctx),
-      };
-      const notFoundResponse = await getAssetFromKV(fallbackEvent, options);
-      const headers = new Headers(notFoundResponse.headers);
-      addSecurityHeaders(headers);
-      return injectAnalytics(new Response(notFoundResponse.body, { status: 200, headers }), env);
-    } catch {
-      return new Response('Not Found', { status: 404 });
-    }
-  }
+async function handleStaticAsset(request, env) {
+  const path = new URL(request.url).pathname;
+  const asset = await env.ASSETS.fetch(request);
+  const headers = new Headers(asset.headers);
+  addSecurityHeaders(headers);
+  if (isHtml(path, asset)) headers.set('Cache-Control', 'no-cache');
+  else if (path.startsWith('/assets/')) headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  return injectAnalytics(
+    new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers }),
+    env
+  );
 }
 
 // ── Analytics injection ──────────────────────────────────────
@@ -73,7 +73,7 @@ function injectAnalytics(response, env) {
 
 // ── Main handler ─────────────────────────────────────────────
 export default {
-  async fetch(request, env, ctx) {
-    return handleStaticAsset(request, env, ctx);
+  async fetch(request, env) {
+    return handleStaticAsset(request, env);
   },
 };
